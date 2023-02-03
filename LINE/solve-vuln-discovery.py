@@ -19,7 +19,7 @@ state = proj.factory.entry_state(args=['toytoytoy', arg])
 simgr = proj.factory.simgr(state)
 
 # Start the execution
-addr_of_win = proj.kb.functions['sub_100003f70'].addr
+addr_of_win = proj.kb.functions['sub_100003ef0'].addr
 simgr.explore(find=addr_of_win) # specify the address to be found
 
 # Check if there are any found paths
