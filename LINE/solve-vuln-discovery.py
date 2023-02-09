@@ -18,6 +18,7 @@ state = proj.factory.entry_state(args=['toytoytoy', arg])
 # Create a simulation manager to control the execution
 simgr = proj.factory.simgr(state)
 
+
 # Start the execution
 addr_of_win = proj.kb.functions['sub_100003ef0'].addr
 simgr.explore(find=addr_of_win) # specify the address to be found
